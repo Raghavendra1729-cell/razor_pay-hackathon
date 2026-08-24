@@ -43,11 +43,14 @@ class AuditEntry(BaseModel):
     detail: str
 
 
+ResultStatus = Literal["auto_matched", "ai_assisted", "needs_review"]
+
+
 class ReconciliationResult(BaseModel):
     order_id: str
     payment_id: str
     gross_amount: int
-    status: Literal["auto_matched", "ai_assisted", "needs_review"]
+    status: ResultStatus
     settlement_id: str | None = None
     bank_txn_id: str | None = None
     confidence: float

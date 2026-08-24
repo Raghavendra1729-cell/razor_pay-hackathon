@@ -107,8 +107,13 @@ The UI reports the resolver mode. Only call a demo AI-assisted when it shows
 
 ```bash
 PYTHONPATH=backend .venv/bin/pytest -q backend/tests
+PYTHONPATH=backend .venv/bin/ruff format --check backend
+PYTHONPATH=backend .venv/bin/ruff check backend
 cd frontend && npm run build
 ```
+
+GitHub Actions runs the same backend checks and frontend production build for
+every push to `main` and every pull request.
 
 ## API
 
@@ -116,6 +121,20 @@ cd frontend && npm run build
 - `POST /api/reconcile/demo` — run the labelled 72-record synthetic batch
 
 Interactive FastAPI docs are available at `http://localhost:8000/docs`.
+
+## Deploy as one container
+
+The production image builds React and serves it from FastAPI, so the browser
+and API use the same origin. It is suitable for a Docker-based host or a
+Hugging Face Docker Space.
+
+```bash
+docker build -t paisamatch .
+docker run --rm -p 7860:7860 -e HF_TOKEN=hf_your_token paisamatch
+```
+
+Open `http://localhost:7860`. Add `HF_TOKEN` as a platform secret; never place
+it in the repository or browser environment.
 
 ## Pitch video
 

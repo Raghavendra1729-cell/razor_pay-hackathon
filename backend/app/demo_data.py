@@ -5,7 +5,9 @@ from datetime import date, timedelta
 from .models import BankDeposit, MerchantOrder, Settlement
 
 
-def demo_batch() -> tuple[list[MerchantOrder], list[Settlement], list[BankDeposit], dict[str, tuple[str, str]]]:
+def demo_batch() -> tuple[
+    list[MerchantOrder], list[Settlement], list[BankDeposit], dict[str, tuple[str, str]]
+]:
     """Return a deterministic, labelled settlement batch for demos and tests.
 
     The first 48 orders are directly matchable. The next 12 have deliberately
@@ -38,7 +40,9 @@ def demo_batch() -> tuple[list[MerchantOrder], list[Settlement], list[BankDeposi
         net_amount = gross_amount - fee - tax
         settlement_id = f"setl_{index:04d}"
         bank_txn_id = f"bank_{index:04d}"
-        reference = order.payment_id if index <= 48 else f"batch-{created_at:%m%d}-{index:02d}"
+        reference = (
+            order.payment_id if index <= 48 else f"batch-{created_at:%m%d}-{index:02d}"
+        )
         settlement = Settlement(
             settlement_id=settlement_id,
             reference=reference,

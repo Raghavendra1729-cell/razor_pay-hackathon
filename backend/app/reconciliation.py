@@ -9,6 +9,7 @@ from .models import (
     ReconciliationReport,
     ReconciliationResult,
     ReportMetrics,
+    ResultStatus,
     Settlement,
 )
 
@@ -24,7 +25,9 @@ class ReconciliationService:
         used_deposits: set[str] = set()
 
         for order in orders:
-            result = self._reconcile_order(order, settlements, deposits, used_settlements, used_deposits)
+            result = self._reconcile_order(
+                order, settlements, deposits, used_settlements, used_deposits
+            )
             results.append(result)
             if result.settlement_id:
                 used_settlements.add(result.settlement_id)
@@ -47,8 +50,10 @@ class ReconciliationService:
             match_rate=self._percentage(len(matched), len(results)),
             precision=self._percentage(correct, len(matched)),
             recall=self._percentage(correct, true_matchable),
-            unresolved_value=sum(item.gross_amount for item in results if item.status == "needs_review"),
-            financial_variance=0,
+            unresolved_value=sum(
+                item.gross_amount for item in results if item.status == "needs_review"
+            ),
+            financial_variance=self._financial_variance(results, settlements, deposits),
             model_mode=self.resolver.mode,
         )
         return ReconciliationReport(metrics=metrics, results=results)
@@ -61,23 +66,48 @@ class ReconciliationService:
         used_settlements: set[str],
         used_deposits: set[str],
     ) -> ReconciliationResult:
-        audit = [AuditEntry(step="normalised", detail="Amounts are evaluated in paise; dates are ISO-normalised.")]
+        audit = [
+            AuditEntry(
+                step="normalised",
+                detail="Amounts are evaluated in paise; dates are ISO-normalised.",
+            )
+        ]
         direct = [
             item
             for item in settlements
-            if item.settlement_id not in used_settlements and item.reference == order.payment_id
+            if item.settlement_id not in used_settlements
+            and item.reference == order.payment_id
         ]
         if len(direct) == 1:
             verified = self._verified_pair(direct[0], deposits, used_deposits)
             if verified:
                 audit.extend(
                     [
-                        AuditEntry(step="exact_match", detail=f"Payment reference matched {direct[0].settlement_id}."),
-                        AuditEntry(step="verified", detail="Gross amount, fees, tax and bank net amount balanced."),
+                        AuditEntry(
+                            step="exact_match",
+                            detail=f"Payment reference matched {direct[0].settlement_id}.",
+                        ),
+                        AuditEntry(
+                            step="verified",
+                            detail="Gross amount, fees, tax and bank net amount balanced.",
+                        ),
                     ]
                 )
-                return self._matched(order, direct[0], verified, "auto_matched", 1.0, "Exact reference and financial invariant matched.", audit)
-            audit.append(AuditEntry(step="blocked", detail="The direct reference exists but its fee or net amount cannot be independently verified."))
+                return self._matched(
+                    order,
+                    direct[0],
+                    verified,
+                    "auto_matched",
+                    1.0,
+                    "Exact reference and financial invariant matched.",
+                    audit,
+                )
+            audit.append(
+                AuditEntry(
+                    step="blocked",
+                    detail="The direct reference exists but its fee or net amount cannot be independently verified.",
+                )
+            )
             return self._unresolved(
                 order,
                 audit,
@@ -92,24 +122,69 @@ class ReconciliationService:
             and item.gross_amount == order.gross_amount
             and abs((item.settled_at - order.created_at).days) <= 3
         ]
-        audit.append(AuditEntry(step="candidate_search", detail=f"Found {len(candidates)} constrained candidate(s)."))
+        audit.append(
+            AuditEntry(
+                step="candidate_search",
+                detail=f"Found {len(candidates)} constrained candidate(s).",
+            )
+        )
+        if not candidates:
+            return self._unresolved(
+                order,
+                audit,
+                self._exception_code(order, settlements, deposits),
+                "No settlement fell within the constrained amount and date window.",
+            )
+
         resolution = self.resolver.resolve(order, candidates)
         audit.append(AuditEntry(step="resolver", detail=resolution.reason))
 
-        settlement = next((item for item in candidates if item.settlement_id == resolution.selected_settlement_id), None)
+        settlement = next(
+            (
+                item
+                for item in candidates
+                if item.settlement_id == resolution.selected_settlement_id
+            ),
+            None,
+        )
         if resolution.decision == "match" and settlement:
             verified = self._verified_pair(settlement, deposits, used_deposits)
             if verified:
-                audit.append(AuditEntry(step="verified", detail="AI proposal passed the financial invariant and bank-evidence check."))
-                return self._matched(order, settlement, verified, "ai_assisted", resolution.confidence, resolution.reason, audit)
-            audit.append(AuditEntry(step="blocked", detail="A proposed match failed independent financial verification."))
-            return self._unresolved(order, audit, "VERIFICATION_FAILED", "The candidate did not balance against a unique bank deposit.")
+                audit.append(
+                    AuditEntry(
+                        step="verified",
+                        detail="Constrained resolution passed the financial invariant and bank-evidence check.",
+                    )
+                )
+                return self._matched(
+                    order,
+                    settlement,
+                    verified,
+                    "ai_assisted",
+                    resolution.confidence,
+                    resolution.reason,
+                    audit,
+                )
+            audit.append(
+                AuditEntry(
+                    step="blocked",
+                    detail="A proposed match failed independent financial verification.",
+                )
+            )
+            return self._unresolved(
+                order,
+                audit,
+                "VERIFICATION_FAILED",
+                "The candidate did not balance against a unique bank deposit.",
+            )
 
         exception_code = self._exception_code(order, settlements, deposits)
         return self._unresolved(order, audit, exception_code, resolution.reason)
 
     @staticmethod
-    def _verified_pair(settlement: Settlement, deposits: list[BankDeposit], used_deposits: set[str]) -> BankDeposit | None:
+    def _verified_pair(
+        settlement: Settlement, deposits: list[BankDeposit], used_deposits: set[str]
+    ) -> BankDeposit | None:
         expected_net = settlement.gross_amount - settlement.fee - settlement.tax
         if expected_net != settlement.net_amount or settlement.fee <= 0:
             return None
@@ -127,7 +202,7 @@ class ReconciliationService:
         order: MerchantOrder,
         settlement: Settlement,
         deposit: BankDeposit,
-        status: str,
+        status: ResultStatus,
         confidence: float,
         explanation: str,
         audit: list[AuditEntry],
@@ -136,7 +211,7 @@ class ReconciliationService:
             order_id=order.order_id,
             payment_id=order.payment_id,
             gross_amount=order.gross_amount,
-            status=status,  # type: ignore[arg-type]
+            status=status,
             settlement_id=settlement.settlement_id,
             bank_txn_id=deposit.bank_txn_id,
             confidence=confidence,
@@ -145,7 +220,9 @@ class ReconciliationService:
         )
 
     @staticmethod
-    def _unresolved(order: MerchantOrder, audit: list[AuditEntry], code: str, explanation: str) -> ReconciliationResult:
+    def _unresolved(
+        order: MerchantOrder, audit: list[AuditEntry], code: str, explanation: str
+    ) -> ReconciliationResult:
         return ReconciliationResult(
             order_id=order.order_id,
             payment_id=order.payment_id,
@@ -158,7 +235,9 @@ class ReconciliationService:
         )
 
     @staticmethod
-    def _exception_code(order: MerchantOrder, settlements: list[Settlement], deposits: list[BankDeposit]) -> str:
+    def _exception_code(
+        order: MerchantOrder, settlements: list[Settlement], deposits: list[BankDeposit]
+    ) -> str:
         if any(item.reference == order.payment_id for item in settlements):
             return "FEE_VARIANCE"
         same_amount = [item for item in deposits if item.amount == order.gross_amount]
@@ -169,3 +248,23 @@ class ReconciliationService:
     @staticmethod
     def _percentage(numerator: int, denominator: int) -> float:
         return round((numerator / denominator * 100) if denominator else 0, 2)
+
+    @staticmethod
+    def _financial_variance(
+        results: list[ReconciliationResult],
+        settlements: list[Settlement],
+        deposits: list[BankDeposit],
+    ) -> int:
+        settlement_by_id = {item.settlement_id: item for item in settlements}
+        deposit_by_id = {item.bank_txn_id: item for item in deposits}
+        variance = 0
+        for result in results:
+            if not result.settlement_id or not result.bank_txn_id:
+                continue
+            settlement = settlement_by_id[result.settlement_id]
+            deposit = deposit_by_id[result.bank_txn_id]
+            expected_net = settlement.gross_amount - settlement.fee - settlement.tax
+            variance += abs(expected_net - settlement.net_amount) + abs(
+                settlement.net_amount - deposit.amount
+            )
+        return variance

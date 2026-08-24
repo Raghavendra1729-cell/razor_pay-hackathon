@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from .models import ReconciliationReport
 from .reconciliation import ReconciliationService
@@ -20,6 +23,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+static_dir = Path(__file__).resolve().parent.parent / "static"
+if (static_dir / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
+
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
@@ -29,3 +36,10 @@ def health() -> dict[str, str]:
 @app.post("/api/reconcile/demo", response_model=ReconciliationReport)
 def reconcile_demo() -> ReconciliationReport:
     return ReconciliationService().reconcile_demo()
+
+
+if (static_dir / "index.html").is_file():
+
+    @app.get("/", include_in_schema=False)
+    def dashboard() -> FileResponse:
+        return FileResponse(static_dir / "index.html")

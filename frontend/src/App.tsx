@@ -47,7 +47,7 @@ function ResultRow({ item, selected, onSelect }: { item: ReconciliationResult; s
 
   return (
     <>
-      <tr className={selected ? "selected" : ""} onClick={onSelect} onKeyDown={handleKeyDown} tabIndex={0} aria-expanded={selected}>
+      <tr className={selected ? "selected" : ""} onClick={onSelect} onKeyDown={handleKeyDown} tabIndex={0} aria-label={`Show audit details for ${item.order_id}`}>
         <td>
           <b>{item.order_id}</b>
           <small>{item.payment_id}</small>

@@ -4,7 +4,9 @@ import json
 import os
 from typing import Protocol
 
+from huggingface_hub.utils import HfHubHTTPError
 from pydantic import ValidationError
+from requests import RequestException
 
 from .models import MerchantOrder, Resolution, Settlement
 
@@ -12,7 +14,9 @@ from .models import MerchantOrder, Resolution, Settlement
 class Resolver(Protocol):
     mode: str
 
-    def resolve(self, order: MerchantOrder, candidates: list[Settlement]) -> Resolution: ...
+    def resolve(
+        self, order: MerchantOrder, candidates: list[Settlement]
+    ) -> Resolution: ...
 
 
 class HeuristicResolver:
@@ -74,17 +78,34 @@ class HuggingFaceResolver:
             response = self.client.chat_completion(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a cautious settlement reconciliation assistant."},
+                    {
+                        "role": "system",
+                        "content": "You are a cautious settlement reconciliation assistant.",
+                    },
                     {"role": "user", "content": json.dumps(prompt)},
                 ],
                 response_format={
                     "type": "json_schema",
-                    "json_schema": {"name": "resolution", "schema": schema, "strict": True},
+                    "json_schema": {
+                        "name": "resolution",
+                        "schema": schema,
+                        "strict": True,
+                    },
                 },
                 max_tokens=240,
             )
             return Resolution.model_validate_json(response.choices[0].message.content)
-        except Exception as exc:  # External inference must fail closed, never create a guessed match.
+        except (
+            HfHubHTTPError,
+            RequestException,
+            ValidationError,
+            AttributeError,
+            IndexError,
+            KeyError,
+            OSError,
+            TypeError,
+            ValueError,
+        ) as exc:
             return Resolution(
                 selected_settlement_id=None,
                 decision="unresolved",
@@ -97,4 +118,6 @@ def configured_resolver() -> Resolver:
     token = os.getenv("HF_TOKEN")
     if not token:
         return HeuristicResolver()
-    return HuggingFaceResolver(token=token, model=os.getenv("HF_MODEL", "Qwen/Qwen3-32B"))
+    return HuggingFaceResolver(
+        token=token, model=os.getenv("HF_MODEL", "Qwen/Qwen3-32B")
+    )

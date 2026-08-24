@@ -27,7 +27,7 @@ h1 em { color: #bd643b; font-weight: 400; }
 .hero-actions { min-width: 245px; }
 .primary { width: 100%; border: 0; border-radius: 8px; padding: 14px 18px; color: white; background: #153b35; box-shadow: 0 4px 0 #0c2924; font-weight: 750; }
 .primary:hover { background: #1d5148; }
-.hero-actions p { margin: 15px 0 0; color: #70807b; font-size: 12px; line-height: 1.5; }
+.hero-actions p { margin: 15px 0 0; color: #5c6c66; font-size: 12px; line-height: 1.5; }
 .empty-state { margin: 48px 0; padding: 68px 30px; text-align: center; background: #edf0eb; border: 1px dashed #bcc8c2; border-radius: 12px; }
 .empty-icon { width: 47px; height: 47px; display: grid; place-items: center; margin: 0 auto 16px; color: #17634f; background: #dcefe7; border-radius: 50%; font-size: 24px; }
 .empty-state h2 { margin-bottom: 8px; font-family: Georgia, serif; font-size: 27px; font-weight: 500; }
@@ -37,7 +37,7 @@ h1 em { color: #bd643b; font-weight: 400; }
 .metric-card { padding: 19px; background: #fffefb; border: 1px solid #e0e4df; border-radius: 9px; }
 .metric-card p { margin-bottom: 12px; color: #6b7773; font-size: 12px; font-weight: 700; }
 .metric-card strong { display: block; margin-bottom: 7px; font-family: Georgia, serif; font-size: 29px; font-weight: 500; letter-spacing: -.8px; }
-.metric-card span { color: #84908c; font-size: 12px; }
+.metric-card span { color: #60716b; font-size: 12px; }
 .report-toolbar { display: flex; justify-content: space-between; gap: 20px; align-items: flex-end; margin-bottom: 20px; }
 .report-toolbar h2 { margin-bottom: 7px; font-family: Georgia, serif; font-size: 30px; font-weight: 500; letter-spacing: -1px; }
 .mode { margin: 0; color: #64716e; font-size: 13px; }
@@ -53,7 +53,7 @@ tbody tr:not(.audit-row) { cursor: pointer; }
 tbody tr:not(.audit-row):hover, tbody tr.selected { background: #f4f8f5; }
 tbody tr:not(.audit-row):focus-visible { outline: 2px solid #397268; outline-offset: -2px; }
 td b { display: block; color: #27332f; font-weight: 700; }
-td small { display: block; margin-top: 3px; color: #84908c; font-size: 11px; }
+td small { display: block; margin-top: 3px; color: #60716b; font-size: 11px; }
 .status { display: inline-block; padding: 4px 7px; border-radius: 999px; font-size: 11px; font-weight: 750; }
 .auto_matched { color: #17634f; background: #dcefe7; }
 .ai_assisted { color: #705318; background: #f9edc9; }
@@ -61,7 +61,7 @@ td small { display: block; margin-top: 3px; color: #84908c; font-size: 11px; }
 .audit-row td { padding: 16px 20px; color: #586560; background: #fbfcfa; line-height: 1.5; }
 .audit-row p { margin-bottom: 8px; }
 .audit-row ol { margin: 0; padding-left: 20px; }
-.table-note { margin: 12px 0; color: #7a8581; font-size: 12px; }
+.table-note { margin: 12px 0; color: #60716b; font-size: 12px; }
 
 @media (max-width: 760px) {
   main { padding: 0 18px 35px; }
