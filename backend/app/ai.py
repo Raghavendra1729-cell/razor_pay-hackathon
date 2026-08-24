@@ -70,26 +70,26 @@ class HuggingFaceResolver:
             "candidates": safe_candidates,
         }
         schema = Resolution.model_json_schema()
-        response = self.client.chat_completion(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "You are a cautious settlement reconciliation assistant."},
-                {"role": "user", "content": json.dumps(prompt)},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {"name": "resolution", "schema": schema, "strict": True},
-            },
-            max_tokens=240,
-        )
         try:
+            response = self.client.chat_completion(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are a cautious settlement reconciliation assistant."},
+                    {"role": "user", "content": json.dumps(prompt)},
+                ],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {"name": "resolution", "schema": schema, "strict": True},
+                },
+                max_tokens=240,
+            )
             return Resolution.model_validate_json(response.choices[0].message.content)
-        except (ValidationError, AttributeError, IndexError, TypeError) as exc:
+        except Exception as exc:  # External inference must fail closed, never create a guessed match.
             return Resolution(
                 selected_settlement_id=None,
                 decision="unresolved",
                 confidence=0.0,
-                reason=f"Model response could not be safely used: {type(exc).__name__}.",
+                reason=f"Model resolution was unavailable and the record was left unresolved: {type(exc).__name__}.",
             )
 
 
