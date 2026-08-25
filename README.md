@@ -25,13 +25,18 @@ The included synthetic batch has **72 merchant orders**:
 | Outcome | Records | Behaviour |
 | --- | ---: | --- |
 | Exact match | 48 | Reference, settlement and bank evidence agree. |
-| Assisted match | 12 | A constrained candidate is resolved, then independently verified. |
+| Assisted match | 12 | Noisy references are resolved from two constrained candidates, then independently verified. |
 | Needs review | 12 | Missing, duplicate or financially inconsistent evidence is not force-matched. |
 
 The deterministic test run reports **83.33% match rate**, **100% precision**,
 **100% recall** against hidden demo ground truth, and **₹0 financial variance**
 for accepted matches. These are reproducible synthetic-demo results, not claims
 about live merchant performance.
+
+The exact-reference baseline covers **66.67%** of the batch. Constrained
+resolution adds **16.66 percentage points** while preserving 100% measured
+precision. All 12 ambiguous cases are sent in one structured model request,
+so the dashboard can report both model-call count and resolver latency.
 
 ## Architecture
 
@@ -43,7 +48,7 @@ FastAPI reconciliation service
   |-- normalise amounts and dates
   |-- exact matcher
   |-- constrained candidate generator
-  |-- Hugging Face JSON-schema resolver (ambiguous records only)
+  |-- one Hugging Face JSON-schema batch call (ambiguous records only)
   '-- financial verifier --> matched result or exception + audit trail
 ```
 
@@ -51,6 +56,7 @@ FastAPI reconciliation service
 
 - Money arithmetic, fees, tax and bank matching are verified in Python.
 - The model can choose only a supplied candidate ID or abstain.
+- Missing, duplicated, cross-order or invented candidate IDs are rejected.
 - Invalid/malformed/unavailable model output becomes `needs_review`.
 - The demo uses synthetic labels only; no customer PII or payment credentials
   are sent to the model.
@@ -98,10 +104,13 @@ token and a model/provider combination that supports strict JSON schema output.
 ```bash
 export HF_TOKEN=hf_your_token
 export HF_MODEL=Qwen/Qwen3-32B
+export HF_PROVIDER=auto
+export HF_TIMEOUT_SECONDS=20
 ```
 
 The UI reports the resolver mode. Only call a demo AI-assisted when it shows
-`Hugging Face structured output`.
+`Hugging Face structured output`. The bounded timeout makes provider failure
+visible and safely moves every affected record to the review queue.
 
 ## Test and build
 

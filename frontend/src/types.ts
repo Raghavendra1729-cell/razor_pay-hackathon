@@ -25,11 +25,15 @@ export type Report = {
     ai_assisted: number;
     needs_review: number;
     match_rate: number;
+    baseline_match_rate: number;
+    assisted_uplift: number;
     precision: number;
     recall: number;
     unresolved_value: number;
     financial_variance: number;
     model_mode: string;
+    model_calls: number;
+    resolver_latency_ms: number;
   };
   results: ReconciliationResult[];
 };

@@ -19,10 +19,10 @@ Show the landing state and point at **Run 72-record demo**.
 Click the button. Explain that the batch contains 72 synthetic merchant orders,
 Razorpay-style settlements and bank deposits. Point out the four cards:
 
-- 83.33% match rate
-- 100% precision and recall against hidden ground truth
+- 83.33% match rate, up 16.66 percentage points from exact matching alone
+- 100% precision and recall against labelled ground truth
 - unresolved monetary value
-- zero financial variance for accepted matches
+- zero financial variance, model-call count and resolver latency
 
 Say the real submission will report the measured numbers produced by the final
 run, not hand-entered claims.
@@ -31,12 +31,13 @@ run, not hand-entered claims.
 
 Scroll to an assisted record, for example `order_0049`, and open it. Explain:
 
-"The deterministic engine first narrows the search by amount and date. Only
-then is the constrained candidate list sent to the Hugging Face model. It must
-return a JSON-schema response choosing a supplied settlement or abstaining."
+"The deterministic engine first narrows the search by amount and date. This
+record still has two candidates with noisy references. All 12 ambiguous cases
+go to Hugging Face in one structured request, and the model must choose a
+supplied settlement or abstain."
 
-Point to the resolver label. Explain that the external model never performs
-money arithmetic or receives customer PII.
+Point to the resolver label, one-call count and latency. Explain that the
+external model never performs money arithmetic or receives customer PII.
 
 ## 2:20–3:15 — Show a failure handled safely
 
@@ -53,9 +54,10 @@ Read two audit entries aloud: normalisation and blocked verification.
 Show the repository README architecture diagram. Say:
 
 "React is the operator dashboard. FastAPI runs normalisation, exact matching,
-candidate generation and the verifier. Hugging Face is limited to structured
-resolution of ambiguous candidates. If the model is unavailable or malformed,
-the record fails closed into review."
+candidate generation and the verifier. Hugging Face is limited to one
+structured batch resolution of ambiguous candidates. If the model is
+unavailable, slow or malformed—or returns a cross-order ID—the record fails
+closed into review."
 
 ## 4:15–5:00 — Close
 

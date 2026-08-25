@@ -100,7 +100,7 @@ export default function App() {
   return (
     <main>
       <header className="topbar">
-        <div className="brand"><span>₹</span><div><b>PaisaMatch</b><small>Verifiable AI finance controller</small></div></div>
+        <div className="brand"><span aria-hidden="true">₹</span><div><b>PaisaMatch</b><small>Verifiable AI finance controller</small></div></div>
         <div className="topbar-meta"><span className="environment">DEMO MODE</span><span>Track 4 · AI Finance Controller</span></div>
       </header>
 
@@ -130,9 +130,9 @@ export default function App() {
         <>
           <section className="metrics" aria-label="Reconciliation metrics">
             <MetricCard label="Match rate" value={`${report.metrics.match_rate}%`} caption={`${report.metrics.auto_matched} exact + ${report.metrics.ai_assisted} assisted`} />
+            <MetricCard label="Assisted uplift" value={`+${report.metrics.assisted_uplift} pp`} caption={`From ${report.metrics.baseline_match_rate}% exact-only baseline`} />
             <MetricCard label="Precision" value={`${report.metrics.precision}%`} caption="Compared with hidden ground truth" />
             <MetricCard label="Unresolved value" value={inr(report.metrics.unresolved_value)} caption={`${report.metrics.needs_review} records need review`} />
-            <MetricCard label="Financial variance" value={inr(report.metrics.financial_variance)} caption="Across all accepted matches" />
           </section>
 
           <section className="report-toolbar">
@@ -140,6 +140,11 @@ export default function App() {
               <p className="eyebrow">BATCH REPORT</p>
               <h2>Every decision has evidence.</h2>
               <p className="mode">Resolver: {report.metrics.model_mode}</p>
+              <div className="run-evidence" role="group" aria-label="Run evidence">
+                <span>{report.metrics.model_calls} hosted model {report.metrics.model_calls === 1 ? "call" : "calls"}</span>
+                <span>{report.metrics.resolver_latency_ms} ms resolver time</span>
+                <span>{inr(report.metrics.financial_variance)} accepted-match variance</span>
+              </div>
             </div>
             <div className="toolbar-actions">
               <button className={filter === "all" ? "filter active" : "filter"} onClick={() => setFilter("all")}>All records</button>
