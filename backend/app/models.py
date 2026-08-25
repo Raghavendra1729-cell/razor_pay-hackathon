@@ -38,6 +38,14 @@ class Resolution(BaseModel):
     reason: str
 
 
+class BatchResolutionItem(Resolution):
+    order_id: str
+
+
+class BatchResolution(BaseModel):
+    resolutions: list[BatchResolutionItem]
+
+
 class AuditEntry(BaseModel):
     step: str
     detail: str
@@ -65,11 +73,15 @@ class ReportMetrics(BaseModel):
     ai_assisted: int
     needs_review: int
     match_rate: float
+    baseline_match_rate: float
+    assisted_uplift: float
     precision: float
     recall: float
     unresolved_value: int
     financial_variance: int
     model_mode: str
+    model_calls: int
+    resolver_latency_ms: int
 
 
 class ReconciliationReport(BaseModel):

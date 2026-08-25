@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from .ai import Resolver, configured_resolver
+from dataclasses import dataclass
+
+from .ai import ResolutionCase, Resolver, configured_resolver
 from .demo_data import demo_batch
 from .models import (
     AuditEntry,
@@ -9,9 +11,16 @@ from .models import (
     ReconciliationReport,
     ReconciliationResult,
     ReportMetrics,
+    Resolution,
     ResultStatus,
     Settlement,
 )
+
+
+@dataclass(frozen=True)
+class PendingResolution:
+    case: ResolutionCase
+    audit: list[AuditEntry]
 
 
 class ReconciliationService:
@@ -20,19 +29,52 @@ class ReconciliationService:
 
     def reconcile_demo(self) -> ReconciliationReport:
         orders, settlements, deposits, ground_truth = demo_batch()
-        results: list[ReconciliationResult] = []
+        results_by_order: dict[str, ReconciliationResult] = {}
+        pending: list[PendingResolution] = []
         used_settlements: set[str] = set()
         used_deposits: set[str] = set()
 
         for order in orders:
-            result = self._reconcile_order(
+            prepared = self._prepare_order(
                 order, settlements, deposits, used_settlements, used_deposits
             )
-            results.append(result)
+            if isinstance(prepared, PendingResolution):
+                pending.append(prepared)
+                continue
+            result = prepared
+            results_by_order[order.order_id] = result
             if result.settlement_id:
                 used_settlements.add(result.settlement_id)
             if result.bank_txn_id:
                 used_deposits.add(result.bank_txn_id)
+
+        resolver_run = self.resolver.resolve_many([item.case for item in pending])
+        for item in pending:
+            order_id = item.case.order.order_id
+            resolution = resolver_run.resolutions.get(
+                order_id,
+                Resolution(
+                    selected_settlement_id=None,
+                    decision="unresolved",
+                    confidence=0.0,
+                    reason="The resolver did not return a decision for this order.",
+                ),
+            )
+            result = self._resolve_case(
+                item,
+                resolution,
+                settlements,
+                deposits,
+                used_settlements,
+                used_deposits,
+            )
+            results_by_order[order_id] = result
+            if result.settlement_id:
+                used_settlements.add(result.settlement_id)
+            if result.bank_txn_id:
+                used_deposits.add(result.bank_txn_id)
+
+        results = [results_by_order[order.order_id] for order in orders]
 
         matched = [item for item in results if item.status != "needs_review"]
         correct = sum(
@@ -42,12 +84,17 @@ class ReconciliationService:
             and ground_truth[item.order_id] == (item.settlement_id, item.bank_txn_id)
         )
         true_matchable = len(ground_truth)
+        auto_matched = sum(item.status == "auto_matched" for item in results)
+        match_rate = self._percentage(len(matched), len(results))
+        baseline_match_rate = self._percentage(auto_matched, len(results))
         metrics = ReportMetrics(
             total_orders=len(orders),
-            auto_matched=sum(item.status == "auto_matched" for item in results),
+            auto_matched=auto_matched,
             ai_assisted=sum(item.status == "ai_assisted" for item in results),
             needs_review=sum(item.status == "needs_review" for item in results),
-            match_rate=self._percentage(len(matched), len(results)),
+            match_rate=match_rate,
+            baseline_match_rate=baseline_match_rate,
+            assisted_uplift=round(match_rate - baseline_match_rate, 2),
             precision=self._percentage(correct, len(matched)),
             recall=self._percentage(correct, true_matchable),
             unresolved_value=sum(
@@ -55,17 +102,19 @@ class ReconciliationService:
             ),
             financial_variance=self._financial_variance(results, settlements, deposits),
             model_mode=self.resolver.mode,
+            model_calls=resolver_run.model_calls,
+            resolver_latency_ms=resolver_run.latency_ms,
         )
         return ReconciliationReport(metrics=metrics, results=results)
 
-    def _reconcile_order(
+    def _prepare_order(
         self,
         order: MerchantOrder,
         settlements: list[Settlement],
         deposits: list[BankDeposit],
         used_settlements: set[str],
         used_deposits: set[str],
-    ) -> ReconciliationResult:
+    ) -> ReconciliationResult | PendingResolution:
         audit = [
             AuditEntry(
                 step="normalised",
@@ -136,14 +185,29 @@ class ReconciliationService:
                 "No settlement fell within the constrained amount and date window.",
             )
 
-        resolution = self.resolver.resolve(order, candidates)
-        audit.append(AuditEntry(step="resolver", detail=resolution.reason))
+        return PendingResolution(
+            case=ResolutionCase(order=order, candidates=candidates), audit=audit
+        )
+
+    def _resolve_case(
+        self,
+        pending: PendingResolution,
+        resolution: Resolution,
+        settlements: list[Settlement],
+        deposits: list[BankDeposit],
+        used_settlements: set[str],
+        used_deposits: set[str],
+    ) -> ReconciliationResult:
+        order = pending.case.order
+        candidates = pending.case.candidates
+        audit = [*pending.audit, AuditEntry(step="resolver", detail=resolution.reason)]
 
         settlement = next(
             (
                 item
                 for item in candidates
-                if item.settlement_id == resolution.selected_settlement_id
+                if item.settlement_id not in used_settlements
+                and item.settlement_id == resolution.selected_settlement_id
             ),
             None,
         )

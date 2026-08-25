@@ -63,6 +63,21 @@ def demo_batch() -> tuple[
         )
         ground_truth[order.order_id] = (settlement_id, bank_txn_id)
 
+        if 49 <= index <= 60:
+            # A same-amount, same-window decoy makes the assisted path genuinely
+            # ambiguous. Its reference points elsewhere and it has no bank proof.
+            settlements.append(
+                Settlement(
+                    settlement_id=f"setl_noise_{index:04d}",
+                    reference=f"legacy-batch-{index + 1000}",
+                    gross_amount=gross_amount,
+                    fee=fee,
+                    tax=tax,
+                    net_amount=net_amount,
+                    settled_at=created_at + timedelta(days=2),
+                )
+            )
+
     # Add noisy source rows that a finance controller must not force-match.
     settlements.append(
         Settlement(
